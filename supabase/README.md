@@ -18,3 +18,4 @@ supabase db reset
 ```
 
 또는 Supabase 대시보드의 SQL Editor에서 파일 내용을 순서대로 복사하여 실행할 수 있습니다.
+  
