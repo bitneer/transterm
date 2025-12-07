@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/client";
+import { type Session } from "@supabase/supabase-js";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +16,25 @@ type TermWithTranslations = Database["public"]["Tables"]["Term"]["Row"] & {
 };
 
 export default function Home() {
+  const supabase = createClient();
+  const [session, setSession] = useState<Session | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TermWithTranslations[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchTerms = async () => {
@@ -171,14 +188,18 @@ export default function Home() {
           {!loading && query && results.length === 0 && (
             <div className="text-center py-12 text-slate-500">
               <p className="text-lg">검색 결과가 없습니다.</p>
-              <p className="text-sm mt-2">새로운 용어를 추가해보세요!</p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => (window.location.href = "/admin/new")}
-              >
-                용어 추가하기
-              </Button>
+              {session && (
+                <>
+                  <p className="text-sm mt-2">새로운 용어를 추가해보세요!</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => (window.location.href = "/admin/new")}
+                  >
+                    용어 추가하기
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
