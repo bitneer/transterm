@@ -148,7 +148,13 @@ export default function Home() {
     } catch (error) {
       console.error("Error updating translation preference:", error);
       toast.error("변경 사항을 저장하지 못했습니다.");
-      // Rollback logic would go here
+
+      // Rollback
+      setResults((prev) => {
+        const newResults = [...prev];
+        newResults[termIndex] = term; // Restore original term
+        return newResults;
+      });
     }
   };
 
@@ -160,6 +166,7 @@ export default function Home() {
   );
 
   const handleDragEnd = async (event: DragEndEvent, termId: number) => {
+    if (!session) return;
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
@@ -201,6 +208,13 @@ export default function Home() {
     } catch (error) {
       console.error("Error updating sort order:", error);
       toast.error("순서 저장에 실패했습니다.");
+
+      // Rollback
+      setResults((prev) => {
+        const newResults = [...prev];
+        newResults[termIndex] = term; // Restore original term
+        return newResults;
+      });
     }
   };
 
