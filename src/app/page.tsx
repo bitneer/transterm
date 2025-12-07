@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Star } from "lucide-react";
+import { toast } from "sonner";
 import type { Database } from "@/types/supabase";
 
 type TermWithTranslations = Database["public"]["Tables"]["Term"]["Row"] & {
@@ -82,6 +83,46 @@ export default function Home() {
     return () => clearTimeout(debounce);
   }, [query]);
 
+  const handleTranslationClick = async (
+    termId: number,
+    translationId: number,
+    currentPreferred: boolean
+  ) => {
+    if (!session) return;
+
+    // Optimistic Update
+    setResults((prevResults) =>
+      prevResults.map((term) => {
+        if (term.id === termId) {
+          const updatedTranslations = term.Translation.map((t) => {
+            if (t.id === translationId) {
+              return { ...t, is_preferred: !currentPreferred };
+            }
+            return t;
+          }).sort(
+            (a, b) => (b.is_preferred ? 1 : 0) - (a.is_preferred ? 1 : 0)
+          );
+          return { ...term, Translation: updatedTranslations };
+        }
+        return term;
+      })
+    );
+
+    try {
+      const { error } = await supabase
+        .from("Translation")
+        .update({ is_preferred: !currentPreferred })
+        .eq("id", translationId);
+
+      if (error) throw error;
+      toast.success("우선순위가 변경되었습니다.");
+    } catch (error) {
+      console.error("Error updating translation preference:", error);
+      toast.error("변경 사항을 저장하지 못했습니다.");
+      // In a real app, we should rollback here
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <div className="container mx-auto px-4 py-16 max-w-3xl">
@@ -153,11 +194,22 @@ export default function Home() {
                         <Badge
                           key={trans.id}
                           variant={trans.is_preferred ? "default" : "secondary"}
-                          className={`text-sm py-1 px-3 ${
+                          className={`text-sm py-1 px-3 transition-all ${
+                            session
+                              ? "cursor-pointer hover:scale-105 active:scale-95"
+                              : "cursor-default"
+                          } ${
                             trans.is_preferred
                               ? "bg-blue-600 hover:bg-blue-700"
                               : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
                           }`}
+                          onClick={() =>
+                            handleTranslationClick(
+                              term.id,
+                              trans.id,
+                              !!trans.is_preferred
+                            )
+                          }
                         >
                           {trans.text}
                           {trans.is_preferred && (
