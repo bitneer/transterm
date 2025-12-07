@@ -10,6 +10,22 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Star } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableBadge } from "@/components/SortableBadge";
 import type { Database } from "@/types/supabase";
 
 type TermWithTranslations = Database["public"]["Tables"]["Term"]["Row"] & {
@@ -61,13 +77,13 @@ export default function Home() {
 
         if (error) throw error;
 
-        // Translation 정렬 (선호 대역어 우선)
+        // Translation 정렬 (sort_order 기준)
         const sortedData =
           data?.map((term) => ({
             ...term,
             Translation: term.Translation.sort(
               (a: any, b: any) =>
-                (b.is_preferred ? 1 : 0) - (a.is_preferred ? 1 : 0)
+                (a.sort_order ?? a.id) - (b.sort_order ?? b.id)
             ),
           })) || [];
 
@@ -89,37 +105,102 @@ export default function Home() {
     currentPreferred: boolean
   ) => {
     if (!session) return;
+    if (currentPreferred) return; // Already preferred (at front), do nothing
 
-    // Optimistic Update
-    setResults((prevResults) =>
-      prevResults.map((term) => {
-        if (term.id === termId) {
-          const updatedTranslations = term.Translation.map((t) => {
-            if (t.id === translationId) {
-              return { ...t, is_preferred: !currentPreferred };
-            }
-            return t;
-          }).sort(
-            (a, b) => (b.is_preferred ? 1 : 0) - (a.is_preferred ? 1 : 0)
-          );
-          return { ...term, Translation: updatedTranslations };
-        }
-        return term;
+    const termIndex = results.findIndex((t) => t.id === termId);
+    if (termIndex === -1) return;
+    const term = results[termIndex];
+
+    const clickedIndex = term.Translation.findIndex(
+      (t) => t.id === translationId
+    );
+    if (clickedIndex === -1) return;
+
+    // Move to front
+    const newTranslations = arrayMove(term.Translation, clickedIndex, 0).map(
+      (t, index) => ({
+        ...t,
+        sort_order: index,
+        is_preferred: index === 0,
       })
     );
 
-    try {
-      const { error } = await supabase
-        .from("Translation")
-        .update({ is_preferred: !currentPreferred })
-        .eq("id", translationId);
+    // Optimistic Update
+    setResults((prev) => {
+      const newResults = [...prev];
+      newResults[termIndex] = { ...term, Translation: newTranslations };
+      return newResults;
+    });
 
-      if (error) throw error;
-      toast.success("우선순위가 변경되었습니다.");
+    try {
+      const updates = newTranslations.map((t) =>
+        supabase
+          .from("Translation")
+          .update({ sort_order: t.sort_order, is_preferred: t.is_preferred })
+          .eq("id", t.id)
+      );
+
+      const updateResults = await Promise.all(updates);
+      const isError = updateResults.some((r) => r.error);
+      if (isError) throw new Error("Some updates failed");
+
+      toast.success("선호 대역어로 설정되었습니다.");
     } catch (error) {
       console.error("Error updating translation preference:", error);
       toast.error("변경 사항을 저장하지 못했습니다.");
-      // In a real app, we should rollback here
+      // Rollback logic would go here
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent, termId: number) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const termIndex = results.findIndex((t) => t.id === termId);
+    if (termIndex === -1) return;
+
+    const term = results[termIndex];
+    const oldIndex = term.Translation.findIndex((t) => t.id === active.id);
+    const newIndex = term.Translation.findIndex((t) => t.id === over.id);
+
+    // Optimistic Update
+    const newTranslations = arrayMove(term.Translation, oldIndex, newIndex).map(
+      (t, index) => ({
+        ...t,
+        sort_order: index,
+        is_preferred: index === 0, // First item is always preferred
+      })
+    );
+
+    setResults((prev) => {
+      const newResults = [...prev];
+      newResults[termIndex] = { ...term, Translation: newTranslations };
+      return newResults;
+    });
+
+    // Backend Update
+    try {
+      // Update each item's sort_order and is_preferred status
+      const updates = newTranslations.map((t) =>
+        supabase
+          .from("Translation")
+          .update({ sort_order: t.sort_order, is_preferred: t.is_preferred })
+          .eq("id", t.id)
+      );
+      await Promise.all(updates);
+    } catch (error) {
+      console.error("Error updating sort order:", error);
+      toast.error("순서 저장에 실패했습니다.");
     }
   };
 
@@ -190,33 +271,31 @@ export default function Home() {
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {term.Translation.map((trans) => (
-                        <Badge
-                          key={trans.id}
-                          variant={trans.is_preferred ? "default" : "secondary"}
-                          className={`text-sm py-1 px-3 transition-all ${
-                            session
-                              ? "cursor-pointer hover:scale-105 active:scale-95"
-                              : "cursor-default"
-                          } ${
-                            trans.is_preferred
-                              ? "bg-blue-600 hover:bg-blue-700"
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-                          }`}
-                          onClick={() =>
-                            handleTranslationClick(
-                              term.id,
-                              trans.id,
-                              !!trans.is_preferred
-                            )
-                          }
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(e) => handleDragEnd(e, term.id)}
+                      >
+                        <SortableContext
+                          items={term.Translation.map((t) => t.id)}
+                          strategy={horizontalListSortingStrategy}
                         >
-                          {trans.text}
-                          {trans.is_preferred && (
-                            <Star className="w-3 h-3 ml-1 fill-current" />
-                          )}
-                        </Badge>
-                      ))}
+                          {term.Translation.map((trans) => (
+                            <SortableBadge
+                              key={trans.id}
+                              translation={trans}
+                              isSessionActive={!!session}
+                              onClick={() =>
+                                handleTranslationClick(
+                                  term.id,
+                                  trans.id,
+                                  !!trans.is_preferred
+                                )
+                              }
+                            />
+                          ))}
+                        </SortableContext>
+                      </DndContext>
                     </div>
 
                     {term.Translation.some((t) => t.usage) && (
