@@ -33,7 +33,12 @@ export function SortableBadge({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...(isSessionActive ? listeners : {})}
+    >
       <Badge
         variant={translation.is_preferred ? "default" : "secondary"}
         className={`text-sm py-1 px-3 transition-all select-none ${
@@ -45,7 +50,7 @@ export function SortableBadge({
             ? "bg-green-600 hover:bg-green-700"
             : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
         }`}
-        onClick={onClick}
+        onClick={isSessionActive ? onClick : undefined}
       >
         {translation.text}
         {translation.is_preferred && <Check className="w-3 h-3 ml-1" />}
