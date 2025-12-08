@@ -1,0 +1,15 @@
+# 의존성 모듈 (절대 건드리면 안 됨)
+node_modules
+
+# Next.js 빌드 결과물 (건드리면 고장 남)
+.next
+out
+build
+
+# 패키지 잠금 파일 (자동 생성되므로 건드리면 안 됨)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# (선택) 정적 파일들이 모여있는 곳 (필요하면 주석 해제)
+# public
