@@ -32,7 +32,9 @@ interface SortableItemState {
   text: string;
 }
 
-export default function NewTermPage() {
+import { Suspense } from 'react';
+
+function NewTermContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -346,22 +348,18 @@ export default function NewTermPage() {
             </CardContent>
           </Card>
 
-          {/* 노트 정보 */}
+          {/* 노트 (선택) */}
           <Card>
             <CardHeader>
-              <CardTitle>노트 (Note)</CardTitle>
+              <CardTitle>노트 (선택)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="note">설명 및 메모</Label>
-                <Textarea
-                  id="note"
-                  placeholder="이 용어에 대한 설명이나 참고사항을 적어주세요."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
+              <Textarea
+                placeholder="용어에 대한 설명이나 참고 사항을 입력하세요."
+                className="min-h-[100px]"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
             </CardContent>
           </Card>
 
