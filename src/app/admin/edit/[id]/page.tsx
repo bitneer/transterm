@@ -1,4 +1,5 @@
 'use client';
+// Force rebuild for sync issue
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
