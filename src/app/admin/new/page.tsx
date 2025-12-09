@@ -378,3 +378,13 @@ function NewTermContent() {
     </div>
   );
 }
+
+export default function NewTermPage() {
+  return (
+    <Suspense
+      fallback={<div className="flex justify-center p-8">로딩 중...</div>}
+    >
+      <NewTermContent />
+    </Suspense>
+  );
+}
