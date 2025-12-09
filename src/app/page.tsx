@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { type Session } from '@supabase/supabase-js';
 import { Input } from '@/components/ui/input';
@@ -32,6 +34,7 @@ type TermWithTranslations = Database['public']['Tables']['Term']['Row'] & {
 };
 
 export default function Home() {
+  const router = useRouter();
   const supabase = createClient();
   const [session, setSession] = useState<Session | null>(null);
   const [query, setQuery] = useState('');
@@ -247,6 +250,17 @@ export default function Home() {
             />
           </div>
         </div>
+        {/* Registration Link (Always visible if query exists and user is logged in) */}
+        {query && session && (
+          <div className="-mt-8 mb-12 text-center">
+            <Link
+              href={`/admin/new?term=${encodeURIComponent(query)}`}
+              className="text-primary text-sm hover:underline"
+            >
+              &quot;{query}&quot; 등록하기
+            </Link>
+          </div>
+        )}
 
         {/* Results */}
         <div className="space-y-6">
@@ -311,18 +325,12 @@ export default function Home() {
                       </DndContext>
                     </div>
 
-                    {term.Translation.some((t) => t.usage) && (
-                      <div className="border-border mt-4 space-y-2 border-t pt-4">
-                        {term.Translation.filter((t) => t.usage).map((t) => (
-                          <div key={t.id} className="text-sm">
-                            <span className="text-foreground font-semibold">
-                              {t.text}:
-                            </span>
-                            <span className="text-muted-foreground ml-2">
-                              {t.usage}
-                            </span>
-                          </div>
-                        ))}
+                    {term.note && (
+                      <div className="border-border text-muted-foreground mt-4 border-t pt-4 text-sm">
+                        <span className="text-foreground mr-2 font-semibold">
+                          Note:
+                        </span>
+                        {term.note}
                       </div>
                     )}
                   </CardContent>
@@ -338,7 +346,11 @@ export default function Home() {
                   <Button
                     variant="outline"
                     className="mt-4"
-                    onClick={() => (window.location.href = '/admin/new')}
+                    onClick={() =>
+                      router.push(
+                        `/admin/new?term=${encodeURIComponent(query)}`,
+                      )
+                    }
                   >
                     용어 추가하기
                   </Button>

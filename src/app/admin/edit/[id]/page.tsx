@@ -6,16 +6,30 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Save, ArrowLeft } from 'lucide-react';
+import { Plus, Save, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableTag } from '../../new/SortableTag';
 
-interface TranslationInput {
+interface SortableItemState {
+  id: string; // string for DnD (existing will be stringified number)
   text: string;
-  isPreferred: boolean;
-  usage: string;
 }
 
 export default function EditTermPage() {
@@ -25,11 +39,22 @@ export default function EditTermPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [name, setName] = useState('');
-  const [aliases, setAliases] = useState('');
-  const [translations, setTranslations] = useState<TranslationInput[]>([
-    { text: '', isPreferred: false, usage: '' },
-  ]);
+  const [note, setNote] = useState('');
+
+  const [aliases, setAliases] = useState<SortableItemState[]>([]);
+  const [newAlias, setNewAlias] = useState('');
+
+  const [translations, setTranslations] = useState<SortableItemState[]>([]);
+  const [newTranslation, setNewTranslation] = useState('');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   useEffect(() => {
     const fetchTerm = async () => {
@@ -49,21 +74,30 @@ export default function EditTermPage() {
       }
 
       setName(data.name);
-      setAliases(data.aliases?.join(', ') || '');
+      // setAliases(data.aliases?.join(', ') || '');
+      if (data.aliases && data.aliases.length > 0) {
+        setAliases(
+          data.aliases.map((a: string, idx: number) => ({
+            id: `alias-db-${idx}-${a}`, // Unique ID for existing aliases
+            text: a,
+          })),
+        );
+      }
+      setNote(data.note || '');
 
       if (data.Translation && data.Translation.length > 0) {
+        const sortedTranslations = data.Translation.sort(
+          (
+            a: { sort_order: number | null; id: number },
+            b: { sort_order: number | null; id: number },
+          ) => (a.sort_order ?? a.id) - (b.sort_order ?? b.id),
+        );
+
         setTranslations(
-          data.Translation.map(
-            (t: {
-              text: string;
-              is_preferred: boolean | null;
-              usage: string | null;
-            }) => ({
-              text: t.text,
-              isPreferred: t.is_preferred || false,
-              usage: t.usage || '',
-            }),
-          ),
+          sortedTranslations.map((t: { id: number; text: string }) => ({
+            id: t.id.toString(),
+            text: t.text,
+          })),
         );
       }
       setLoading(false);
@@ -72,36 +106,96 @@ export default function EditTermPage() {
     fetchTerm();
   }, [id, router]);
 
-  const addTranslationField = () => {
-    setTranslations([
-      ...translations,
-      { text: '', isPreferred: false, usage: '' },
-    ]);
-  };
-
-  const removeTranslationField = (index: number) => {
-    if (translations.length > 1) {
-      const newTranslations = [...translations];
-      newTranslations.splice(index, 1);
-      setTranslations(newTranslations);
+  // --- Aliases Logic ---
+  const handleAddAliases = () => {
+    if (!newAlias.trim()) return;
+    const newItems = newAlias
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((text) => ({
+        id: `alias-${Date.now()}-${Math.random()}`,
+        text,
+      }));
+    if (newItems.length > 0) {
+      setAliases((prev) => [...prev, ...newItems]);
+      setNewAlias('');
     }
   };
 
-  const updateTranslation = (
-    index: number,
-    field: keyof TranslationInput,
-    value: string | boolean,
-  ) => {
-    const newTranslations = [...translations];
-    // @ts-expect-error: indexing with dynamic key
-    newTranslations[index][field] = value;
-    setTranslations(newTranslations);
+  const handleAliasKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddAliases();
+    }
+  };
+
+  const removeAlias = (id: string) => {
+    setAliases(aliases.filter((t) => t.id !== id));
+  };
+
+  const handleAliasDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setAliases((items) => {
+        const oldIndex = items.findIndex((t) => t.id === active.id);
+        const newIndex = items.findIndex((t) => t.id === over?.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  // --- Translations Logic ---
+
+  const handleAddTranslations = () => {
+    if (!newTranslation.trim()) return;
+
+    const newItems = newTranslation
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0)
+      .map((text) => ({
+        id: `trans-${Date.now()}-${Math.random()}`,
+        text,
+      }));
+
+    if (newItems.length > 0) {
+      setTranslations((prev) => [...prev, ...newItems]);
+      setNewTranslation('');
+    }
+  };
+
+  const handleTranslationKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTranslations();
+    }
+  };
+
+  const removeTranslationField = (id: string) => {
+    setTranslations(translations.filter((t) => t.id !== id));
+  };
+
+  const handleTranslationDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      setTranslations((items) => {
+        const oldIndex = items.findIndex((t) => t.id === active.id);
+        const newIndex = items.findIndex((t) => t.id === over?.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       toast.error('용어 이름을 입력해주세요.');
+      return;
+    }
+    if (translations.length === 0) {
+      toast.error('최소 하나의 대역어가 필요합니다.');
       return;
     }
     if (translations.some((t) => !t.text.trim())) {
@@ -112,20 +206,21 @@ export default function EditTermPage() {
     setSaving(true);
     try {
       // 1. Term 업데이트
-      const aliasArray = aliases
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const aliasArray = aliases.map((a) => a.text);
 
       const { error: termError } = await supabase
         .from('Term')
-        .update({ name, aliases: aliasArray })
+        .update({
+          name,
+          aliases: aliasArray,
+          note: note.trim() || null,
+        })
         .eq('id', id);
 
       if (termError) throw termError;
 
-      // 2. Translations 업데이트 (기존 삭제 후 재등록)
-      // 먼저 기존 대역어 삭제
+      // 2. Translations 업데이트 (기존 삭제 후 재등록 - 간단한 처리)
+      // Transaction would be better but simple sequential ops for now
       const { error: deleteError } = await supabase
         .from('Translation')
         .delete()
@@ -133,12 +228,11 @@ export default function EditTermPage() {
 
       if (deleteError) throw deleteError;
 
-      // 새 대역어 등록
-      const translationInserts = translations.map((t) => ({
+      const translationInserts = translations.map((t, index) => ({
         term_id: Number(id),
         text: t.text,
-        is_preferred: t.isPreferred,
-        usage: t.usage || null,
+        is_preferred: index === 0,
+        sort_order: index,
       }));
 
       const { error: transError } = await supabase
@@ -152,7 +246,16 @@ export default function EditTermPage() {
       router.refresh();
     } catch (error) {
       console.error('Error updating term:', error);
-      toast.error(`수정 실패: ${(error as Error).message}`);
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: string }).code === '23505'
+      ) {
+        toast.error('이미 존재하는 용어 이름입니다. 다른 이름을 사용해주세요.');
+      } else {
+        toast.error(`수정 실패: ${(error as Error).message}`);
+      }
     } finally {
       setSaving(false);
     }
@@ -187,7 +290,7 @@ export default function EditTermPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">용어 이름 (필수)</Label>
+                <Label htmlFor="name">용어 이름</Label>
                 <Input
                   id="name"
                   placeholder="예: Context"
@@ -196,13 +299,58 @@ export default function EditTermPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="aliases">이명 / 복수형 (쉼표로 구분)</Label>
-                <Input
-                  id="aliases"
-                  placeholder="예: Ctx, Contexts"
-                  value={aliases}
-                  onChange={(e) => setAliases(e.target.value)}
-                />
+                <Label htmlFor="aliases">별명</Label>
+
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="추가할 영어 별명을 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
+                      value={newAlias}
+                      onChange={(e) => setNewAlias(e.target.value)}
+                      onKeyDown={handleAliasKeyDown}
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddAliases}
+                      variant="secondary"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      추가
+                    </Button>
+                  </div>
+
+                  <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
+                    {aliases.length === 0 ? (
+                      <div className="text-muted-foreground py-2 text-center text-sm">
+                        등록된 별명이 없습니다.
+                      </div>
+                    ) : (
+                      <DndContext
+                        id="dnd-aliases"
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleAliasDragEnd}
+                      >
+                        <SortableContext
+                          items={aliases.map((t) => t.id)}
+                          strategy={rectSortingStrategy}
+                        >
+                          <div className="text-primary flex flex-wrap gap-2">
+                            {aliases.map((alias) => (
+                              <SortableTag
+                                key={alias.id}
+                                id={alias.id}
+                                text={alias.text}
+                                isPreferred={false}
+                                onRemove={() => removeAlias(alias.id)}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -211,75 +359,75 @@ export default function EditTermPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>한글 대역어</CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addTranslationField}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                대역어 추가
-              </Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              {translations.map((trans, index) => (
-                <div
-                  key={index}
-                  className="relative space-y-4 rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
+              <div className="flex gap-2">
+                <Input
+                  placeholder="추가할 대역어를 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
+                  value={newTranslation}
+                  onChange={(e) => setNewTranslation(e.target.value)}
+                  onKeyDown={handleTranslationKeyDown}
+                />
+                <Button
+                  type="button"
+                  onClick={handleAddTranslations}
+                  variant="secondary"
                 >
-                  {translations.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 text-red-500 hover:bg-red-50 hover:text-red-600"
-                      onClick={() => removeTranslationField(index)}
+                  <Plus className="mr-2 h-4 w-4" />
+                  추가
+                </Button>
+              </div>
+
+              <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
+                {translations.length === 0 ? (
+                  <div className="text-muted-foreground py-2 text-center text-sm">
+                    등록된 대역어가 없습니다.
+                  </div>
+                ) : (
+                  <DndContext
+                    id="dnd-translations"
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTranslationDragEnd}
+                  >
+                    <SortableContext
+                      items={translations.map((t) => t.id)}
+                      strategy={rectSortingStrategy}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                      <div className="text-primary flex flex-wrap gap-2">
+                        {translations.map((trans, index) => (
+                          <SortableTag
+                            key={trans.id}
+                            id={trans.id}
+                            text={trans.text}
+                            isPreferred={index === 0}
+                            onRemove={() => removeTranslationField(trans.id)}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>대역어 (필수)</Label>
-                      <Input
-                        placeholder="예: 맥락"
-                        value={trans.text}
-                        onChange={(e) =>
-                          updateTranslation(index, 'text', e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2 pt-8">
-                      <Checkbox
-                        id={`preferred-${index}`}
-                        checked={trans.isPreferred}
-                        onCheckedChange={(checked) =>
-                          updateTranslation(index, 'isPreferred', checked)
-                        }
-                      />
-                      <Label
-                        htmlFor={`preferred-${index}`}
-                        className="cursor-pointer"
-                      >
-                        선호 대역어 (대표)
-                      </Label>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>용례 / 설명 (선택)</Label>
-                    <Textarea
-                      placeholder="예: 일반적인 상황에서 사용"
-                      value={trans.usage}
-                      onChange={(e) =>
-                        updateTranslation(index, 'usage', e.target.value)
-                      }
-                      className="h-20"
-                    />
-                  </div>
-                </div>
-              ))}
+          {/* 노트 정보 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>노트 (Note)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="note">설명 및 메모</Label>
+                <Textarea
+                  id="note"
+                  placeholder="이 용어에 대한 설명이나 참고사항을 적어주세요."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
             </CardContent>
           </Card>
 
