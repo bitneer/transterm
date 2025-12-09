@@ -6,9 +6,8 @@ import { type Session } from '@supabase/supabase-js';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Star } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -52,7 +51,7 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase.auth]);
 
   useEffect(() => {
     const fetchTerms = async () => {
@@ -83,8 +82,10 @@ export default function Home() {
           data?.map((term) => ({
             ...term,
             Translation: term.Translation.sort(
-              (a: any, b: any) =>
-                (a.sort_order ?? a.id) - (b.sort_order ?? b.id),
+              (
+                a: Database['public']['Tables']['Translation']['Row'],
+                b: Database['public']['Tables']['Translation']['Row'],
+              ) => (a.sort_order ?? a.id) - (b.sort_order ?? b.id),
             ),
           })) || [];
 
@@ -98,7 +99,7 @@ export default function Home() {
 
     const debounce = setTimeout(fetchTerms, 300);
     return () => clearTimeout(debounce);
-  }, [query]);
+  }, [query, supabase]);
 
   const handleTranslationClick = async (
     termId: number,
