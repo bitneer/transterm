@@ -337,7 +337,7 @@ export default function Home() {
                 </Card>
               ))}
 
-          {!loading && query && results.length === 0 && (
+          {!loading && query && results.length === 0 && !session && (
             <div className="text-muted-foreground py-12 text-center">
               <p className="text-lg">검색 결과가 없습니다.</p>
               {session && (
