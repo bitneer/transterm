@@ -223,6 +223,14 @@ export default function Home() {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+      if (session && query.trim()) {
+        router.push(`/admin/new?term=${encodeURIComponent(query)}`);
+      }
+    }
+  };
+
   return (
     <div className="bg-background text-foreground min-h-screen font-sans transition-colors duration-300">
       <div className="container mx-auto max-w-3xl px-4 py-16">
@@ -247,6 +255,7 @@ export default function Home() {
               className="bg-card border-border focus-visible:ring-primary w-full rounded-lg py-6 pl-12 text-lg shadow-xl"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
             />
           </div>
         </div>
