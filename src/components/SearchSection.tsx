@@ -54,6 +54,7 @@ export function SearchSection({
     const fetchTerms = async () => {
       if (!query.trim()) {
         setResults(initialResults);
+        setLoading(false);
         return;
       }
 
@@ -70,23 +71,34 @@ export function SearchSection({
 
         if (error) throw error;
 
-        // Translation Sorting
-        const sortedData =
-          data?.map((term) => ({
-            ...term,
-            Translation: term.Translation.sort(
-              (
-                a: Database['public']['Tables']['Translation']['Row'],
-                b: Database['public']['Tables']['Translation']['Row'],
-              ) => (a.sort_order ?? a.id) - (b.sort_order ?? b.id),
-            ),
-          })) || [];
-
         // Check race condition: if query changed while fetching, ignore this result
         if (query !== lastQueryRef.current) return;
 
-        // Cast to correct type
-        setResults(sortedData as unknown as TermWithTranslations[]);
+        if (data) {
+          // Data patching: sort translations and ensure at least one is preferred if translations exist
+          const patchedData = data.map((term) => {
+            if (term.Translation && term.Translation.length > 0) {
+              // 1. Sort by sort_order
+              term.Translation.sort(
+                (
+                  a: Database['public']['Tables']['Translation']['Row'],
+                  b: Database['public']['Tables']['Translation']['Row'],
+                ) => (a.sort_order ?? a.id) - (b.sort_order ?? b.id),
+              );
+
+              // 2. Ensure at least one is preferred
+              const hasPreferred = term.Translation.some(
+                (tr: Database['public']['Tables']['Translation']['Row']) =>
+                  tr.is_preferred,
+              );
+              if (!hasPreferred) {
+                term.Translation[0].is_preferred = true;
+              }
+            }
+            return term;
+          });
+          setResults(patchedData as TermWithTranslations[]);
+        }
       } catch (error) {
         console.error('Error fetching terms:', error);
       } finally {
@@ -131,7 +143,10 @@ export function SearchSection({
             placeholder="검색할 용어를 입력하세요"
             className="bg-card border-border focus-visible:ring-primary w-full rounded-lg py-6 pr-12 pl-12 text-lg shadow-xl"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (e.target.value.trim()) setLoading(true);
+            }}
             onKeyDown={handleKeyDown}
           />
           <Loader2
