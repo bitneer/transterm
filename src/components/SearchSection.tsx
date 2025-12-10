@@ -159,6 +159,7 @@ export function SearchSection({
 
       {query &&
         session &&
+        !loading &&
         !results.some(
           (term) => term.name.toLowerCase() === query.trim().toLowerCase(),
         ) && (
@@ -179,7 +180,7 @@ export function SearchSection({
           ))}
         </div>
 
-        {query && results.length === 0 && (
+        {query && results.length === 0 && !loading && (
           <div className="text-muted-foreground py-12 text-center">
             <p className="text-lg">검색 결과가 없습니다.</p>
           </div>
