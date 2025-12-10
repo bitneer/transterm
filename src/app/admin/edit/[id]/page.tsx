@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Plus, Save, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -27,6 +26,18 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableTag } from '../../new/SortableTag';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 
 interface SortableItemState {
   id: string; // string for DnD (existing will be stringified number)
@@ -42,11 +53,10 @@ export default function EditTermPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [name, setName] = useState('');
   const [note, setNote] = useState('');
 
-  const [aliases, setAliases] = useState<SortableItemState[]>([]);
-  const [newAlias, setNewAlias] = useState('');
+  const [englishTerms, setEnglishTerms] = useState<SortableItemState[]>([]);
+  const [newEnglishTerm, setNewEnglishTerm] = useState('');
 
   const [translations, setTranslations] = useState<SortableItemState[]>([]);
   const [newTranslation, setNewTranslation] = useState('');
@@ -75,17 +85,17 @@ export default function EditTermPage() {
         return;
       }
 
-      setName(data.name);
-      // setAliases(data.aliases?.join(', ') || '');
-      if (data.aliases && data.aliases.length > 0) {
-        setAliases(
-          data.aliases.map((a: string, idx: number) => ({
-            id: `alias-db-${idx}-${a}`, // Unique ID for existing aliases
-            text: a,
-          })),
-        );
-      }
       setNote(data.note || '');
+
+      // Combine name and aliases into englishTerms
+      const loadedTerms = [
+        { id: `term-name-${data.id}`, text: data.name },
+        ...(data.aliases || []).map((a: string, idx: number) => ({
+          id: `alias-db-${idx}-${a}`,
+          text: a,
+        })),
+      ];
+      setEnglishTerms(loadedTerms);
 
       if (data.Translation && data.Translation.length > 0) {
         const sortedTranslations = data.Translation.sort(
@@ -108,38 +118,38 @@ export default function EditTermPage() {
     fetchTerm();
   }, [id, router, supabase]);
 
-  // --- Aliases Logic ---
-  const handleAddAliases = () => {
-    if (!newAlias.trim()) return;
-    const newItems = newAlias
+  // --- English Terms Logic ---
+  const handleAddEnglishTerms = () => {
+    if (!newEnglishTerm.trim()) return;
+    const newItems = newEnglishTerm
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean)
       .map((text) => ({
-        id: `alias-${Date.now()}-${Math.random()}`,
+        id: `eng-${Date.now()}-${Math.random()}`,
         text,
       }));
     if (newItems.length > 0) {
-      setAliases((prev) => [...prev, ...newItems]);
-      setNewAlias('');
+      setEnglishTerms((prev) => [...prev, ...newItems]);
+      setNewEnglishTerm('');
     }
   };
 
-  const handleAliasKeyDown = (e: React.KeyboardEvent) => {
+  const handleEnglishTermKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddAliases();
+      handleAddEnglishTerms();
     }
   };
 
-  const removeAlias = (id: string) => {
-    setAliases(aliases.filter((t) => t.id !== id));
+  const removeEnglishTerm = (id: string) => {
+    setEnglishTerms(englishTerms.filter((t) => t.id !== id));
   };
 
-  const handleAliasDragEnd = (event: DragEndEvent) => {
+  const handleEnglishTermDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (active.id !== over?.id) {
-      setAliases((items) => {
+      setEnglishTerms((items) => {
         const oldIndex = items.findIndex((t) => t.id === active.id);
         const newIndex = items.findIndex((t) => t.id === over?.id);
         return arrayMove(items, oldIndex, newIndex);
@@ -192,8 +202,8 @@ export default function EditTermPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast.error('용어 이름을 입력해주세요.');
+    if (englishTerms.length === 0) {
+      toast.error('최소 하나의 영문 용어를 입력해주세요.');
       return;
     }
     if (translations.length === 0) {
@@ -208,7 +218,8 @@ export default function EditTermPage() {
     setSaving(true);
     try {
       // 1. Term 업데이트
-      const aliasArray = aliases.map((a) => a.text);
+      const name = englishTerms[0].text;
+      const aliasArray = englishTerms.slice(1).map((a) => a.text);
 
       const { error: termError } = await supabase
         .from('Term')
@@ -263,6 +274,23 @@ export default function EditTermPage() {
     }
   };
 
+  const handleDelete = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('Term').delete().eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('용어가 삭제되었습니다.');
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Error deleting term:', error);
+      toast.error('삭제에 실패했습니다.');
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
@@ -285,73 +313,60 @@ export default function EditTermPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* 용어 정보 */}
+          {/* 용어 정보 (Unified) */}
           <Card>
             <CardHeader>
-              <CardTitle>용어 정보 (English)</CardTitle>
+              <CardTitle>영문 용어</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">용어 이름</Label>
-                <Input
-                  id="name"
-                  placeholder="예: Context"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="aliases">별명</Label>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="추가할 영문 용어를 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
+                    value={newEnglishTerm}
+                    onChange={(e) => setNewEnglishTerm(e.target.value)}
+                    onKeyDown={handleEnglishTermKeyDown}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddEnglishTerms}
+                    variant="secondary"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    추가
+                  </Button>
+                </div>
 
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="추가할 영어 별명을 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
-                      value={newAlias}
-                      onChange={(e) => setNewAlias(e.target.value)}
-                      onKeyDown={handleAliasKeyDown}
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleAddAliases}
-                      variant="secondary"
+                <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
+                  {englishTerms.length === 0 ? (
+                    <div className="text-muted-foreground py-2 text-center text-sm">
+                      등록된 용어가 없습니다. 최소 하나 이상 등록해주세요.
+                    </div>
+                  ) : (
+                    <DndContext
+                      id="dnd-english-terms"
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleEnglishTermDragEnd}
                     >
-                      <Plus className="mr-2 h-4 w-4" />
-                      추가
-                    </Button>
-                  </div>
-
-                  <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
-                    {aliases.length === 0 ? (
-                      <div className="text-muted-foreground py-2 text-center text-sm">
-                        등록된 별명이 없습니다.
-                      </div>
-                    ) : (
-                      <DndContext
-                        id="dnd-aliases"
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleAliasDragEnd}
+                      <SortableContext
+                        items={englishTerms.map((t) => t.id)}
+                        strategy={rectSortingStrategy}
                       >
-                        <SortableContext
-                          items={aliases.map((t) => t.id)}
-                          strategy={rectSortingStrategy}
-                        >
-                          <div className="text-primary flex flex-wrap gap-2">
-                            {aliases.map((alias) => (
-                              <SortableTag
-                                key={alias.id}
-                                id={alias.id}
-                                text={alias.text}
-                                isPreferred={false}
-                                onRemove={() => removeAlias(alias.id)}
-                              />
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    )}
-                  </div>
+                        <div className="text-primary flex flex-wrap gap-2">
+                          {englishTerms.map((term, index) => (
+                            <SortableTag
+                              key={term.id}
+                              id={term.id}
+                              text={term.text}
+                              isPreferred={index === 0} // First item is preferred
+                              onRemove={() => removeEnglishTerm(term.id)}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -362,10 +377,10 @@ export default function EditTermPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>한글 대역어</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="추가할 대역어를 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
+                  placeholder="추가할 한글 대역어를 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
                   value={newTranslation}
                   onChange={(e) => setNewTranslation(e.target.value)}
                   onKeyDown={handleTranslationKeyDown}
@@ -417,32 +432,68 @@ export default function EditTermPage() {
           {/* 노트 정보 */}
           <Card>
             <CardHeader>
-              <CardTitle>노트 (Note)</CardTitle>
+              <CardTitle>Note</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="note">설명 및 메모</Label>
-                <Textarea
-                  id="note"
-                  placeholder="이 용어에 대한 설명이나 참고사항을 적어주세요."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
+            <CardContent className="space-y-4">
+              <Textarea
+                id="note"
+                placeholder="이 용어에 대한 설명이나 참고사항을 적어주세요."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="min-h-[100px]"
+              />
             </CardContent>
           </Card>
 
-          <Button type="submit" className="w-full" size="lg" disabled={saving}>
-            {saving ? (
-              '저장 중...'
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                수정사항 저장하기
-              </>
-            )}
-          </Button>
+          <div className="flex gap-4">
+            <Button
+              type="submit"
+              className="flex-1"
+              size="lg"
+              disabled={saving}
+            >
+              {saving ? (
+                '저장 중...'
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  수정사항 저장하기
+                </>
+              )}
+            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="lg"
+                  disabled={saving}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  삭제하기
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    이 작업은 되돌릴 수 없습니다. 용어와 관련된 모든 대역어가
+                    영구적으로 삭제됩니다.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>취소</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    삭제 확인
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </form>
       </div>
     </div>
