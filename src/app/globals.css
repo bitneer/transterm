@@ -142,3 +142,8 @@
 .w-md-editor-toolbar [data-name='image'] {
   display: none !important;
 }
+
+/* Force transparent background for Markdown Viewer to inherit container color */
+.wmde-markdown {
+  background-color: transparent !important;
+}

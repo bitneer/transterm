@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -30,16 +30,26 @@ import { Session } from '@supabase/supabase-js';
 interface TermCardProps {
   initialTerm: TermWithTranslations;
   session: Session | null;
+  mode?: 'compact' | 'detail';
 }
 
 export function TermCard({
   initialTerm,
   session,
   onDelete,
+  mode = 'compact',
 }: TermCardProps & { onDelete?: (id: number) => void }) {
   const [term, setTerm] = useState(initialTerm);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(mode === 'detail');
   const supabase = createClient();
+
+  // Ensure isExpanded is true if mode is detail (though we might want to allow collapsing even in detail mode? User said "Note 내용 항상 표시")
+  // User said "Note 내용을 항상 표시 (확장/축소 버튼 없이)".
+  // So if mode === 'detail', isExpanded should be effectively ignored or always true, and toggle hidden.
+
+  useEffect(() => {
+    if (mode === 'detail') setIsExpanded(true);
+  }, [mode]);
 
   const handleTranslationClick = async (
     termId: number,
@@ -147,17 +157,30 @@ export function TermCard({
   };
 
   return (
-    <Card className="border-border overflow-hidden transition-all hover:shadow-md">
+    <Card className="border-border grid gap-0 overflow-hidden py-0 transition-all hover:shadow-md">
       <div className="flex flex-col">
         {/* Compact Row Header */}
-        <div className="flex min-h-[3rem] items-center gap-4 px-4 py-2">
+        <div
+          className={`flex items-center gap-4 ${
+            mode === 'detail' ? 'min-h-[5rem] p-6' : 'min-h-[3rem] px-4 py-2'
+          }`}
+        >
           {/* Left: Term Name & Aliases */}
           <div className="flex min-w-[150px] flex-col justify-center">
             <Link href={`/term/${term.name}`} className="hover:underline">
-              <span className="text-foreground text-base font-bold">
+              <span
+                className={`text-foreground font-bold ${
+                  mode === 'detail' ? 'text-3xl' : 'text-base'
+                }`}
+              >
                 {term.name}
               </span>
             </Link>
+            {mode === 'detail' && term.aliases && term.aliases.length > 0 && (
+              <span className="text-muted-foreground mt-1 text-sm">
+                ({term.aliases.join(', ')})
+              </span>
+            )}
           </div>
 
           {/* Center: Translations */}
@@ -191,7 +214,7 @@ export function TermCard({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            {term.note && (
+            {term.note && mode !== 'detail' && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -229,8 +252,12 @@ export function TermCard({
         </div>
 
         {/* Expanded Note Section */}
-        {isExpanded && term.note && (
-          <div className="border-border bg-muted/30 animate-in slide-in-from-top-2 fade-in border-t p-4 duration-200">
+        {(isExpanded || mode === 'detail') && term.note && (
+          <div
+            className={`border-border animate-in slide-in-from-top-2 fade-in border-t bg-slate-100 duration-200 dark:bg-slate-900 ${
+              mode === 'detail' ? 'p-6' : 'p-4'
+            }`}
+          >
             <div className="text-muted-foreground prose dark:prose-invert max-w-none text-sm">
               <MarkdownViewer source={term.note} />
             </div>

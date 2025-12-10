@@ -54,7 +54,7 @@ export default function MarkdownEditor({
         value={value}
         onChange={onChange}
         height={height}
-        preview="live"
+        preview="edit"
         visibleDragbar={false}
         className="overflow-hidden rounded-md border border-slate-200 dark:border-slate-800"
         textareaProps={{
