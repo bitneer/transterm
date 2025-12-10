@@ -62,12 +62,15 @@ export async function generateMetadata({
   };
 }
 
+import { TermCard } from '@/components/TermCard';
+
 export default async function TermPage({ params }: PageProps) {
   const { slug } = await params;
   const terms = await getTerms(slug);
-  // Need to get session here only if we want to pass it? No, SearchSection handles its own session.
-  // Actually, SearchSection handles session. So we don't need to fetch it here unless for SSR condition logic?
-  // But SearchSection is a client component, it will fetch session on mount.
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const decodedSlug = decodeURIComponent(slug);
 
@@ -80,7 +83,18 @@ export default async function TermPage({ params }: PageProps) {
           <Breadcrumbs items={[{ label: decodedSlug }]} />
         </div>
 
-        <SearchSection initialResults={terms} />
+        <SearchSection />
+
+        <div className="mt-8 space-y-6">
+          {terms.map((term) => (
+            <TermCard
+              key={term.id}
+              initialTerm={term}
+              session={session}
+              mode="detail"
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
