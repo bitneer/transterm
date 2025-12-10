@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import MarkdownEditor from '@/components/MarkdownEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Save, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -211,7 +211,7 @@ function NewTermContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-sans dark:bg-slate-950">
-      <div className="mx-auto max-w-2xl space-y-8">
+      <div className="mx-auto max-w-5xl space-y-8">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -222,24 +222,87 @@ function NewTermContent() {
           </h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* 용어 정보 (Unified) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>영문 용어</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 gap-8 md:grid-cols-2"
+        >
+          {/* Left Column: Term & Translations */}
+          <div className="space-y-8">
+            {/* 용어 정보 (Unified) */}
+            <Card>
+              <CardHeader>
+                <CardTitle>영문 용어</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="쉼표로 구분하여 일괄 추가 가능"
+                      value={newEnglishTerm}
+                      onChange={(e) => setNewEnglishTerm(e.target.value)}
+                      onKeyDown={handleEnglishTermKeyDown}
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddEnglishTerms}
+                      variant="secondary"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      추가
+                    </Button>
+                  </div>
+
+                  <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
+                    {englishTerms.length === 0 ? (
+                      <div className="text-muted-foreground py-2 text-center text-sm">
+                        등록된 용어가 없습니다. 최소 하나 이상 등록해주세요.
+                      </div>
+                    ) : (
+                      <DndContext
+                        id="dnd-english-terms"
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleEnglishTermDragEnd}
+                      >
+                        <SortableContext
+                          items={englishTerms.map((t) => t.id)}
+                          strategy={rectSortingStrategy}
+                        >
+                          <div className="text-primary flex flex-wrap gap-2">
+                            {englishTerms.map((term, index) => (
+                              <SortableTag
+                                key={term.id}
+                                id={term.id}
+                                text={term.text}
+                                isPreferred={index === 0} // First item is preferred
+                                onRemove={() => removeEnglishTerm(term.id)}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 대역어 정보 */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>한글 대역어</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex gap-2">
                   <Input
-                    placeholder="추가할 영문 용어를 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
-                    value={newEnglishTerm}
-                    onChange={(e) => setNewEnglishTerm(e.target.value)}
-                    onKeyDown={handleEnglishTermKeyDown}
+                    placeholder="쉼표로 구분하여 일괄 추가 가능"
+                    value={newTranslation}
+                    onChange={(e) => setNewTranslation(e.target.value)}
+                    onKeyDown={handleTranslationKeyDown}
                   />
                   <Button
                     type="button"
-                    onClick={handleAddEnglishTerms}
+                    onClick={handleAddTranslations}
                     variant="secondary"
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -248,29 +311,29 @@ function NewTermContent() {
                 </div>
 
                 <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
-                  {englishTerms.length === 0 ? (
+                  {translations.length === 0 ? (
                     <div className="text-muted-foreground py-2 text-center text-sm">
-                      등록된 용어가 없습니다. 최소 하나 이상 등록해주세요.
+                      등록된 대역어가 없습니다.
                     </div>
                   ) : (
                     <DndContext
-                      id="dnd-english-terms"
+                      id="dnd-translations"
                       sensors={sensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={handleEnglishTermDragEnd}
+                      onDragEnd={handleTranslationDragEnd}
                     >
                       <SortableContext
-                        items={englishTerms.map((t) => t.id)}
+                        items={translations.map((t) => t.id)}
                         strategy={rectSortingStrategy}
                       >
                         <div className="text-primary flex flex-wrap gap-2">
-                          {englishTerms.map((term, index) => (
+                          {translations.map((trans, index) => (
                             <SortableTag
-                              key={term.id}
-                              id={term.id}
-                              text={term.text}
-                              isPreferred={index === 0} // First item is preferred
-                              onRemove={() => removeEnglishTerm(term.id)}
+                              key={trans.id}
+                              id={trans.id}
+                              text={trans.text}
+                              isPreferred={index === 0}
+                              onRemove={() => removeTranslationField(trans.id)}
                             />
                           ))}
                         </div>
@@ -278,92 +341,44 @@ function NewTermContent() {
                     </DndContext>
                   )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* 대역어 정보 */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>한글 대역어</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="추가할 한글 대역어를 입력하세요 (쉼표로 구분하여 일괄 추가 가능)"
-                  value={newTranslation}
-                  onChange={(e) => setNewTranslation(e.target.value)}
-                  onKeyDown={handleTranslationKeyDown}
-                />
-                <Button
-                  type="button"
-                  onClick={handleAddTranslations}
-                  variant="secondary"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  추가
-                </Button>
-              </div>
+          {/* Right Column: Note & Action */}
+          <div className="flex flex-col gap-8">
+            {/* 노트 (선택) */}
+            <Card className="flex flex-1 flex-col">
+              <CardHeader>
+                <CardTitle>Note</CardTitle>
+              </CardHeader>
+              <CardContent className="flex min-h-[400px] flex-1 flex-col space-y-4">
+                <div className="flex-1">
+                  <MarkdownEditor
+                    value={note}
+                    onChange={(val) => setNote(val || '')}
+                    height="100%"
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="min-h-[3rem] rounded-lg border border-dashed p-4">
-                {translations.length === 0 ? (
-                  <div className="text-muted-foreground py-2 text-center text-sm">
-                    등록된 대역어가 없습니다.
-                  </div>
-                ) : (
-                  <DndContext
-                    id="dnd-translations"
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTranslationDragEnd}
-                  >
-                    <SortableContext
-                      items={translations.map((t) => t.id)}
-                      strategy={rectSortingStrategy}
-                    >
-                      <div className="text-primary flex flex-wrap gap-2">
-                        {translations.map((trans, index) => (
-                          <SortableTag
-                            key={trans.id}
-                            id={trans.id}
-                            text={trans.text}
-                            isPreferred={index === 0}
-                            onRemove={() => removeTranslationField(trans.id)}
-                          />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 노트 (선택) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Note</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                placeholder="용어에 대한 설명이나 참고 사항을 입력하세요."
-                className="min-h-[100px]"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </CardContent>
-          </Card>
-
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? (
-              '저장 중...'
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                용어 저장하기
-              </>
-            )}
-          </Button>
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? (
+                '저장 중...'
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  용어 저장하기
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     </div>

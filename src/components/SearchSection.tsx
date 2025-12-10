@@ -62,14 +62,30 @@ export function SearchSection({
 
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('Term')
-          .select('*, Translation(*)')
-          // Use safe quoting for the array containment check
-          .or(
+        // 1. Find matched translations first
+        const { data: translationData } = await supabase
+          .from('Translation')
+          .select('term_id')
+          .ilike('text', `%${query}%`);
+
+        const translationPropIds = translationData
+          ? translationData.map((t) => t.term_id)
+          : [];
+
+        // 2. Find Terms (Name/Alias OR Matched Translation ID)
+        let queryBuilder = supabase.from('Term').select('*, Translation(*)');
+
+        if (translationPropIds.length > 0) {
+          queryBuilder = queryBuilder.or(
+            `name.ilike.${query}%,aliases.cs.{"${query.replace(/"/g, '\\"')}"},id.in.(${translationPropIds.join(',')})`,
+          );
+        } else {
+          queryBuilder = queryBuilder.or(
             `name.ilike.${query}%,aliases.cs.{"${query.replace(/"/g, '\\"')}"}`,
-          )
-          .order('name');
+          );
+        }
+
+        const { data, error } = await queryBuilder.order('name');
 
         if (error) throw error;
 
@@ -181,7 +197,14 @@ export function SearchSection({
       <div className="space-y-6">
         <div>
           {results.map((term) => (
-            <TermCard key={term.id} initialTerm={term} session={session} />
+            <TermCard
+              key={term.id}
+              initialTerm={term}
+              session={session}
+              onDelete={(deletedId) => {
+                setResults((prev) => prev.filter((t) => t.id !== deletedId));
+              }}
+            />
           ))}
         </div>
       </div>

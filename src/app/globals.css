@@ -122,3 +122,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Restore list styles for Markdown Editor & Preview */
+.wmde-markdown ul {
+  list-style-type: disc !important;
+  padding-left: 1.5em !important;
+}
+
+.wmde-markdown ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5em !important;
+}
+
+.wmde-markdown li {
+  list-style-position: outside !important;
+}
+
+/* Hide Image button in Markdown Editor toolbar */
+.w-md-editor-toolbar [data-name='image'] {
+  display: none !important;
+}

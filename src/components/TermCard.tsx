@@ -4,8 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Pencil } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Pencil, ChevronDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -23,6 +23,7 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableBadge } from '@/components/SortableBadge';
+import MarkdownViewer from '@/components/MarkdownViewer';
 import { TermWithTranslations } from '@/types';
 import { Session } from '@supabase/supabase-js';
 
@@ -31,8 +32,13 @@ interface TermCardProps {
   session: Session | null;
 }
 
-export function TermCard({ initialTerm, session }: TermCardProps) {
+export function TermCard({
+  initialTerm,
+  session,
+  onDelete,
+}: TermCardProps & { onDelete?: (id: number) => void }) {
   const [term, setTerm] = useState(initialTerm);
+  const [isExpanded, setIsExpanded] = useState(false);
   const supabase = createClient();
 
   const handleTranslationClick = async (
@@ -125,72 +131,112 @@ export function TermCard({ initialTerm, session }: TermCardProps) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm('정말로 이 용어를 삭제하시겠습니까?')) return;
+
+    try {
+      const { error } = await supabase.from('Term').delete().eq('id', term.id);
+      if (error) throw error;
+
+      toast.success('용어가 삭제되었습니다.');
+      onDelete?.(term.id);
+    } catch (error) {
+      console.error('Error deleting term:', error);
+      toast.error('삭제에 실패했습니다.');
+    }
+  };
+
   return (
-    <Card className="border-border overflow-hidden transition-all hover:shadow-lg">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-baseline gap-3">
-            {/* Make Title a Link to the SSR page */}
+    <Card className="border-border overflow-hidden transition-all hover:shadow-md">
+      <div className="flex flex-col">
+        {/* Compact Row Header */}
+        <div className="flex min-h-[3rem] items-center gap-4 px-4 py-2">
+          {/* Left: Term Name & Aliases */}
+          <div className="flex min-w-[150px] flex-col justify-center">
             <Link href={`/term/${term.name}`} className="hover:underline">
-              <CardTitle className="text-foreground text-2xl font-bold">
+              <span className="text-foreground text-base font-bold">
                 {term.name}
-              </CardTitle>
-            </Link>
-            {term.aliases && term.aliases.length > 0 && (
-              <span className="text-muted-foreground text-sm">
-                ({term.aliases.join(', ')})
               </span>
-            )}
+            </Link>
           </div>
-          {session && (
-            <Link href={`/admin/edit/${term.id}`}>
+
+          {/* Center: Translations */}
+          <div className="flex flex-1 flex-wrap gap-2">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={term.Translation.map((t) => t.id)}
+                strategy={horizontalListSortingStrategy}
+              >
+                {term.Translation.map((trans) => (
+                  <SortableBadge
+                    key={trans.id}
+                    translation={trans}
+                    isSessionActive={!!session}
+                    onClick={() =>
+                      handleTranslationClick(
+                        term.id,
+                        trans.id,
+                        !!trans.is_preferred,
+                      )
+                    }
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            {term.note && (
               <Button
                 variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground h-8 w-8"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className={`text-muted-foreground hover:text-foreground transition-transform ${
+                  isExpanded ? 'bg-muted rotate-180' : ''
+                }`}
               >
-                <Pencil className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4" />
               </Button>
-            </Link>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4 flex flex-wrap gap-2">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={term.Translation.map((t) => t.id)}
-              strategy={horizontalListSortingStrategy}
-            >
-              {term.Translation.map((trans) => (
-                <SortableBadge
-                  key={trans.id}
-                  translation={trans}
-                  isSessionActive={!!session}
-                  onClick={() =>
-                    handleTranslationClick(
-                      term.id,
-                      trans.id,
-                      !!trans.is_preferred,
-                    )
-                  }
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+            )}
+
+            {session && (
+              <>
+                <Link href={`/admin/edit/${term.id}`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        {term.note && (
-          <div className="border-border text-muted-foreground mt-4 border-t pt-4 text-sm">
-            <span className="text-foreground mr-2 font-semibold">Note:</span>
-            {term.note}
+        {/* Expanded Note Section */}
+        {isExpanded && term.note && (
+          <div className="border-border bg-muted/30 animate-in slide-in-from-top-2 fade-in border-t p-4 duration-200">
+            <div className="text-muted-foreground prose dark:prose-invert max-w-none text-sm">
+              <MarkdownViewer source={term.note} />
+            </div>
           </div>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
