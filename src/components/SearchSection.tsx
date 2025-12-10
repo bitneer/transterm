@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
@@ -22,7 +22,7 @@ export function SearchSection({
   initialResults = [],
 }: SearchSectionProps) {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] =
@@ -137,7 +137,16 @@ export function SearchSection({
       <div className="group relative mb-12">
         <div className="from-border to-primary/20 absolute -inset-0.5 rounded-lg bg-gradient-to-r opacity-20 blur transition duration-200 group-hover:opacity-40"></div>
         <div className="relative flex items-center">
-          <Search className="text-muted-foreground absolute left-4 h-5 w-5" />
+          <Search
+            className={`text-muted-foreground absolute left-4 h-5 w-5 transition-all duration-200 ${
+              loading ? 'scale-75 opacity-0' : 'scale-100 opacity-100'
+            }`}
+          />
+          <Loader2
+            className={`text-muted-foreground absolute left-4 h-5 w-5 animate-spin transition-all duration-200 ${
+              loading ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+            }`}
+          />
           <Input
             type="text"
             placeholder="검색할 용어를 입력하세요"
@@ -149,17 +158,11 @@ export function SearchSection({
             }}
             onKeyDown={handleKeyDown}
           />
-          <Loader2
-            className={`text-muted-foreground absolute right-4 h-5 w-5 animate-spin transition-opacity duration-200 ${
-              loading ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
         </div>
       </div>
 
       {query &&
         session &&
-        !loading &&
         !results.some(
           (term) => term.name.toLowerCase() === query.trim().toLowerCase(),
         ) && (
@@ -174,17 +177,11 @@ export function SearchSection({
         )}
 
       <div className="space-y-6">
-        <div className={loading ? 'opacity-50 transition-opacity' : ''}>
+        <div>
           {results.map((term) => (
             <TermCard key={term.id} initialTerm={term} session={session} />
           ))}
         </div>
-
-        {query && results.length === 0 && !loading && (
-          <div className="text-muted-foreground py-12 text-center">
-            <p className="text-lg">검색 결과가 없습니다.</p>
-          </div>
-        )}
       </div>
     </>
   );
