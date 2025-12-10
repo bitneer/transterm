@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,6 +35,7 @@ interface SortableItemState {
 
 export default function EditTermPage() {
   const router = useRouter();
+  const supabase = createClient();
   const params = useParams();
   const id = params.id as string;
 
@@ -105,7 +106,7 @@ export default function EditTermPage() {
     };
 
     fetchTerm();
-  }, [id, router]);
+  }, [id, router, supabase]);
 
   // --- Aliases Logic ---
   const handleAddAliases = () => {
