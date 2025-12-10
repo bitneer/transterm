@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search } from 'lucide-react';
+import { Search, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -294,14 +294,27 @@ export default function Home() {
                   className="border-border overflow-hidden transition-all hover:shadow-lg"
                 >
                   <CardHeader className="pb-3">
-                    <div className="flex items-baseline gap-3">
-                      <CardTitle className="text-foreground text-2xl font-bold">
-                        {term.name}
-                      </CardTitle>
-                      {term.aliases && term.aliases.length > 0 && (
-                        <span className="text-muted-foreground text-sm">
-                          ({term.aliases.join(', ')})
-                        </span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-baseline gap-3">
+                        <CardTitle className="text-foreground text-2xl font-bold">
+                          {term.name}
+                        </CardTitle>
+                        {term.aliases && term.aliases.length > 0 && (
+                          <span className="text-muted-foreground text-sm">
+                            ({term.aliases.join(', ')})
+                          </span>
+                        )}
+                      </div>
+                      {session && (
+                        <Link href={`/admin/edit/${term.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-foreground h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </Link>
                       )}
                     </div>
                   </CardHeader>
