@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { type Session } from '@supabase/supabase-js';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Search, Loader2 } from 'lucide-react';
 import { TermCard } from '@/components/TermCard';
 import { TermWithTranslations } from '@/types';
@@ -30,6 +29,9 @@ export function SearchSection({
     useState<TermWithTranslations[]>(initialResults);
   const [loading, setLoading] = useState(false);
 
+  // Track the latest query to prevent race conditions
+  const lastQueryRef = useRef(query);
+
   // Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -47,19 +49,7 @@ export function SearchSection({
 
   // Search Logic
   useEffect(() => {
-    // If query matches initialQuery, we might already have results (SSR).
-    // But if user types, we fetch.
-    // To simplify: if initialQuery is set and we haven't typed yet, don't fetch (rely on initialResults).
-    // However, explicit fetching ensures client-side consistency.
-    // Let's us a simplified debounce approach.
-
-    // Skip fetch if query is exactly the initial one AND we have results?
-    // Actually, allowing re-fetch is safer for consistency, but we want to avoid double-fetch on load.
-    // Let's checking if query changed.
-
-    // A simple way: just fetch. The initialResults are good for initial paint.
-    // But we need to avoid "flashing" or overwriting SSR data with empty if the effect runs too early.
-    // For now, let's just run the effect logic.
+    lastQueryRef.current = query;
 
     const fetchTerms = async () => {
       if (!query.trim()) {
@@ -92,22 +82,22 @@ export function SearchSection({
             ),
           })) || [];
 
+        // Check race condition: if query changed while fetching, ignore this result
+        if (query !== lastQueryRef.current) return;
+
         // Cast to correct type
         setResults(sortedData as unknown as TermWithTranslations[]);
       } catch (error) {
         console.error('Error fetching terms:', error);
       } finally {
-        setLoading(false);
+        // Only turn off loading if we are still the latest query
+        if (query === lastQueryRef.current) {
+          setLoading(false);
+        }
       }
     };
 
-    // If this is the FIRST render and we have initialResults matching the query, skip fetch?
-    // We can rely on the debounce.
     const debounce = setTimeout(() => {
-      // Optimization: if query is exactly initialQuery and we have initialResults, maybe don't fetch?
-      // But the user might have navigated back. Let's just fetch to be safe and 'live'.
-      // To avoid Overwriting SSR data immediately, we could check.
-      // But simplest perfect behavior is "always source of truth is DB".
       fetchTerms();
     }, 300);
 
@@ -135,18 +125,19 @@ export function SearchSection({
       <div className="group relative mb-12">
         <div className="from-border to-primary/20 absolute -inset-0.5 rounded-lg bg-gradient-to-r opacity-20 blur transition duration-200 group-hover:opacity-40"></div>
         <div className="relative flex items-center">
-          {loading ? (
-            <Loader2 className="text-muted-foreground absolute left-4 h-5 w-5 animate-spin" />
-          ) : (
-            <Search className="text-muted-foreground absolute left-4 h-5 w-5" />
-          )}
+          <Search className="text-muted-foreground absolute left-4 h-5 w-5" />
           <Input
             type="text"
             placeholder="검색할 용어를 입력하세요"
-            className="bg-card border-border focus-visible:ring-primary w-full rounded-lg py-6 pl-12 text-lg shadow-xl"
+            className="bg-card border-border focus-visible:ring-primary w-full rounded-lg py-6 pr-12 pl-12 text-lg shadow-xl"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
+          />
+          <Loader2
+            className={`text-muted-foreground absolute right-4 h-5 w-5 animate-spin transition-opacity duration-200 ${
+              loading ? 'opacity-100' : 'opacity-0'
+            }`}
           />
         </div>
       </div>
@@ -174,26 +165,8 @@ export function SearchSection({
         </div>
 
         {query && results.length === 0 && (
-          <div
-            className={`text-muted-foreground py-12 text-center ${
-              loading ? 'opacity-50 transition-opacity' : ''
-            }`}
-          >
+          <div className="text-muted-foreground py-12 text-center">
             <p className="text-lg">검색 결과가 없습니다.</p>
-            {session && (
-              <>
-                <p className="mt-2 text-sm">새로운 용어를 추가해보세요!</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() =>
-                    router.push(`/admin/new?term=${encodeURIComponent(query)}`)
-                  }
-                >
-                  용어 추가하기
-                </Button>
-              </>
-            )}
           </div>
         )}
       </div>

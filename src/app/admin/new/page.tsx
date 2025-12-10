@@ -191,7 +191,7 @@ function NewTermContent() {
       if (transError) throw transError;
 
       toast.success('용어가 성공적으로 등록되었습니다!');
-      router.push('/');
+      router.push(`/term/${encodeURIComponent(name)}`);
     } catch (error) {
       console.error('Error saving term:', error);
       if (

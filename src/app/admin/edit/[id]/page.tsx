@@ -255,7 +255,7 @@ export default function EditTermPage() {
       if (transError) throw transError;
 
       toast.success('용어가 성공적으로 수정되었습니다!');
-      router.push('/admin');
+      router.push(`/term/${encodeURIComponent(name)}`);
       router.refresh();
     } catch (error) {
       console.error('Error updating term:', error);
