@@ -167,15 +167,17 @@ export function TermCard({
         >
           {/* Left: Term Name & Aliases */}
           <div className="flex min-w-[150px] flex-col justify-center">
-            <Link href={`/term/${term.name}`} className="hover:underline">
-              <span
-                className={`text-foreground font-bold ${
-                  mode === 'detail' ? 'text-3xl' : 'text-base'
-                }`}
-              >
+            {mode === 'detail' ? (
+              <span className="text-foreground text-3xl font-bold">
                 {term.name}
               </span>
-            </Link>
+            ) : (
+              <Link href={`/term/${term.name}`} className="hover:underline">
+                <span className="text-foreground text-base font-bold">
+                  {term.name}
+                </span>
+              </Link>
+            )}
             {mode === 'detail' && term.aliases && term.aliases.length > 0 && (
               <span className="text-muted-foreground mt-1 text-sm">
                 ({term.aliases.join(', ')})
