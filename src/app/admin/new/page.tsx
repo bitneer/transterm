@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,6 +37,7 @@ import { Suspense } from 'react';
 function NewTermContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
 
   const [name, setName] = useState('');
