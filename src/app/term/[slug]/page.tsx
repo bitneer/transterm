@@ -24,7 +24,7 @@ async function getTerms(slug: string): Promise<TermWithTranslations[]> {
   const { data, error } = await supabase
     .from('Term')
     .select('*, Translation(*)')
-    .or(`name.ilike.${decodedSlug}%,aliases.cs.{"${safeSlug}"}`)
+    .or(`name.ilike.${decodedSlug},aliases.cs.{"${safeSlug}"}`)
     .order('name');
 
   console.log('Search Debug - Query Error:', error);
