@@ -17,9 +17,11 @@ interface SearchSectionProps {
   initialResults?: TermWithTranslations[];
 }
 
+const DEFAULT_RESULTS: TermWithTranslations[] = [];
+
 export function SearchSection({
   initialQuery = '',
-  initialResults = [],
+  initialResults = DEFAULT_RESULTS,
 }: SearchSectionProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
