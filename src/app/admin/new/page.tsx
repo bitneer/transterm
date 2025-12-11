@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -47,10 +47,18 @@ function NewTermContent() {
   const [translations, setTranslations] = useState<SortableItemState[]>([]);
   const [newTranslation, setNewTranslation] = useState('');
 
+  // Ref to track submission status instantly (bypassing state update delays)
+  const isSubmitting = useRef(false);
+
   useEffect(() => {
     const termQuery = searchParams.get('term');
     if (termQuery) {
-      if (termQuery) {
+      // Check if the query contains Korean characters
+      const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(termQuery);
+
+      if (hasKorean) {
+        setTranslations([{ id: `trans-${Date.now()}`, text: termQuery }]);
+      } else {
         setEnglishTerms([{ id: `term-${Date.now()}`, text: termQuery }]);
       }
     }
@@ -148,6 +156,10 @@ function NewTermContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent double submission
+    if (isSubmitting.current) return;
+
     if (englishTerms.length === 0) {
       toast.error('최소 하나의 영문 용어를 입력해주세요.');
       return;
@@ -158,6 +170,8 @@ function NewTermContent() {
     }
 
     setLoading(true);
+    isSubmitting.current = true;
+
     try {
       // 1. Term 저장
       // 첫 번째 항목이 name, 나머지가 aliases
@@ -174,7 +188,10 @@ function NewTermContent() {
         .select()
         .single();
 
-      if (termError) throw termError;
+      if (termError) {
+        console.error('Supabase Term Insert Error:', termError);
+        throw termError;
+      }
 
       // 2. Translations 저장
       const translationInserts = translations.map((t, index) => ({
@@ -188,12 +205,22 @@ function NewTermContent() {
         .from('Translation')
         .insert(translationInserts);
 
-      if (transError) throw transError;
+      if (transError) {
+        console.error('Supabase Translation Insert Error:', transError);
+        throw transError;
+      }
 
       toast.success('용어가 성공적으로 등록되었습니다!');
       router.push(`/term/${encodeURIComponent(name)}`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving term:', error);
+      // Log all properties including non-enumerable ones if possible, or just stringify
+      try {
+        console.error('Error details:', JSON.stringify(error, null, 2));
+      } catch (e) {
+        console.error('Could not stringify error:', e);
+      }
+
       if (
         typeof error === 'object' &&
         error !== null &&
@@ -202,10 +229,16 @@ function NewTermContent() {
       ) {
         toast.error('이미 등록된 용어입니다. 다른 이름을 사용해주세요.');
       } else {
-        toast.error(`저장 실패: ${(error as Error).message}`);
+        const errObj = error as { message?: string; details?: string };
+        const message =
+          errObj?.message ||
+          errObj?.details ||
+          '알 수 없는 오류가 발생했습니다.';
+        toast.error(`저장 실패: ${message}`);
       }
     } finally {
       setLoading(false);
+      isSubmitting.current = false;
     }
   };
 

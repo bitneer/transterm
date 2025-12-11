@@ -30,6 +30,7 @@ export function SearchSection({
   const [results, setResults] =
     useState<TermWithTranslations[]>(initialResults);
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Track the latest query to prevent race conditions
   const lastQueryRef = useRef(query);
@@ -54,38 +55,48 @@ export function SearchSection({
     lastQueryRef.current = query;
 
     const fetchTerms = async () => {
-      if (!query.trim()) {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) {
         setResults(initialResults);
+        setHasMore(false);
         setLoading(false);
         return;
       }
 
       setLoading(true);
       try {
+        let translationPropIds: string[] = [];
+
         // 1. Find matched translations first
+        // User requested to allow 1-char search for translations as well
         const { data: translationData } = await supabase
           .from('Translation')
           .select('term_id')
-          .ilike('text', `%${query}%`);
+          .ilike('text', `%${trimmedQuery}%`)
+          .limit(50); // Limit translation matches to avoid huge ID lists
 
-        const translationPropIds = translationData
-          ? translationData.map((t) => t.term_id)
-          : [];
+        if (translationData) {
+          translationPropIds = translationData.map((t) => t.term_id);
+        }
 
         // 2. Find Terms (Name/Alias OR Matched Translation ID)
         let queryBuilder = supabase.from('Term').select('*, Translation(*)');
 
         if (translationPropIds.length > 0) {
           queryBuilder = queryBuilder.or(
-            `name.ilike.${query}%,aliases.cs.{"${query.replace(/"/g, '\\"')}"},id.in.(${translationPropIds.join(',')})`,
+            `name.ilike.${trimmedQuery}%,aliases.cs.{"${trimmedQuery.replace(/"/g, '\\"')}"},id.in.(${translationPropIds.join(',')})`,
           );
         } else {
           queryBuilder = queryBuilder.or(
-            `name.ilike.${query}%,aliases.cs.{"${query.replace(/"/g, '\\"')}"}`,
+            `name.ilike.${trimmedQuery}%,aliases.cs.{"${trimmedQuery.replace(/"/g, '\\"')}"}`,
           );
         }
 
-        const { data, error } = await queryBuilder.order('name');
+        // Limit the final results to prevent UI clutter (FETCH LIMIT + 1 to detect hasMore)
+        const limit = 10;
+        const { data, error } = await queryBuilder
+          .order('name')
+          .limit(limit + 1);
 
         if (error) throw error;
 
@@ -93,8 +104,12 @@ export function SearchSection({
         if (query !== lastQueryRef.current) return;
 
         if (data) {
+          const hasMore = data.length > limit;
+          const displayData = hasMore ? data.slice(0, limit) : data;
+          setHasMore(hasMore);
+
           // Data patching: sort translations and ensure at least one is preferred if translations exist
-          const patchedData = data.map((term) => {
+          const patchedData = displayData.map((term) => {
             if (term.Translation && term.Translation.length > 0) {
               // 1. Sort by sort_order
               term.Translation.sort(
@@ -152,8 +167,7 @@ export function SearchSection({
 
   return (
     <>
-      <div className="group relative mb-12">
-        <div className="from-border to-primary/20 absolute -inset-0.5 rounded-lg bg-gradient-to-r opacity-20 blur transition duration-200 group-hover:opacity-40"></div>
+      <div className="relative mb-12">
         <div className="relative flex items-center">
           <Search
             className={`text-muted-foreground absolute left-4 h-5 w-5 transition-all duration-200 ${
@@ -168,7 +182,7 @@ export function SearchSection({
           <Input
             type="text"
             placeholder="검색할 용어를 입력하세요"
-            className="bg-card border-border focus-visible:ring-primary w-full rounded-lg py-6 pr-12 pl-12 text-lg shadow-xl"
+            className="bg-background border-input focus-visible:ring-primary w-full rounded-lg border py-6 pr-12 pl-12 text-lg shadow-sm transition-shadow focus-visible:shadow-md"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -207,6 +221,12 @@ export function SearchSection({
             />
           ))}
         </div>
+
+        {hasMore && (
+          <div className="text-muted-foreground py-4 text-center text-sm">
+            검색 결과가 더 있습니다. 검색어를 구체적으로 입력해주세요.
+          </div>
+        )}
       </div>
     </>
   );
