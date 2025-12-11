@@ -160,7 +160,11 @@ export function SearchSection({
       if (exactMatch) {
         router.push(`/term/${encodeURIComponent(exactMatch.name)}`);
       } else {
-        toast.info('목록에서 용어를 선택하거나 정확한 용어를 입력해주세요.');
+        if (session) {
+          router.push(`/admin/new?term=${encodeURIComponent(query.trim())}`);
+        } else {
+          toast.info('목록에서 용어를 선택하거나 정확한 용어를 입력해주세요.');
+        }
       }
     }
   };
