@@ -32,7 +32,8 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from('Term')
       .select(`*, Translation (*)`)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(10);
 
     if (error) {
       console.error('Error fetching terms:', error);
@@ -84,7 +85,7 @@ export default function AdminPage() {
               </Button>
             </Link>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
-              용어 관리
+              관리자 대시보드
             </h1>
           </div>
           <div className="flex gap-2">
@@ -102,73 +103,78 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border bg-white shadow-sm dark:bg-slate-900">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>용어 (English)</TableHead>
-                <TableHead>이명 (Aliases)</TableHead>
-                <TableHead>대역어 (Translations)</TableHead>
-                <TableHead className="text-right">관리</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+            최근 등록한 용어
+          </h2>
+          <div className="rounded-lg border bg-white shadow-sm dark:bg-slate-900">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center">
-                    로딩 중...
-                  </TableCell>
+                  <TableHead>용어 (English)</TableHead>
+                  <TableHead>별명 (Aliases)</TableHead>
+                  <TableHead>대역어 (Translations)</TableHead>
+                  <TableHead className="text-right">관리</TableHead>
                 </TableRow>
-              ) : terms.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="py-8 text-center text-slate-500"
-                  >
-                    등록된 용어가 없습니다.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                terms.map((term) => (
-                  <TableRow key={term.id}>
-                    <TableCell className="font-medium">{term.name}</TableCell>
-                    <TableCell>{term.aliases?.join(', ') || '-'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {term.Translation.map((t) => (
-                          <Badge
-                            key={t.id}
-                            variant={t.is_preferred ? 'default' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {t.text}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-blue-600"
-                        onClick={() => router.push(`/admin/edit/${term.id}`)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-red-600"
-                        onClick={() => handleDelete(term.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center">
+                      로딩 중...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : terms.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="py-8 text-center text-slate-500"
+                    >
+                      등록된 용어가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  terms.map((term) => (
+                    <TableRow key={term.id}>
+                      <TableCell className="font-medium">{term.name}</TableCell>
+                      <TableCell>{term.aliases?.join(', ') || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {term.Translation.map((t) => (
+                            <Badge
+                              key={t.id}
+                              variant={t.is_preferred ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {t.text}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="space-x-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                          onClick={() => router.push(`/admin/edit/${term.id}`)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-red-600"
+                          onClick={() => handleDelete(term.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
     </div>
