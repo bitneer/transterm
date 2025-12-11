@@ -9,7 +9,15 @@ export function AppHeader() {
         </h1>
       </Link>
       <p className="text-muted-foreground text-lg">
-        용어 대역어 for bitneer.dev
+        용어 대역어 for{' '}
+        <a
+          href="https://www.bitneer.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary decoration-primary/40 hover:decoration-primary font-medium underline decoration-dotted underline-offset-4 transition-colors"
+        >
+          bitneer.dev
+        </a>
       </p>
     </header>
   );
