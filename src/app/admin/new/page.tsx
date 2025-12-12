@@ -161,7 +161,7 @@ function NewTermContent() {
     if (isSubmitting.current) return;
 
     if (englishTerms.length === 0) {
-      toast.error('최소 하나의 영문 용어를 입력해주세요.');
+      toast.error('최소 하나의 영문 용어를 입력하세요.');
       return;
     }
     if (translations.length === 0) {

@@ -203,7 +203,7 @@ export default function EditTermPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (englishTerms.length === 0) {
-      toast.error('최소 하나의 영문 용어를 입력해주세요.');
+      toast.error('최소 하나의 영문 용어를 입력하세요.');
       return;
     }
     if (translations.length === 0) {
@@ -211,7 +211,7 @@ export default function EditTermPage() {
       return;
     }
     if (translations.some((t) => !t.text.trim())) {
-      toast.error('모든 대역어 필드를 입력해주세요.');
+      toast.error('모든 대역어 필드를 입력하세요.');
       return;
     }
 

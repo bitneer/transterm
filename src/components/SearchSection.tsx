@@ -163,7 +163,7 @@ export function SearchSection({
         if (session) {
           router.push(`/admin/new?term=${encodeURIComponent(query.trim())}`);
         } else {
-          toast.info('목록에서 용어를 선택하거나 정확한 용어를 입력해주세요.');
+          toast.info('목록에서 용어를 선택하거나 정확한 용어를 입력하세요.');
         }
       }
     }
@@ -228,7 +228,7 @@ export function SearchSection({
 
         {hasMore && (
           <div className="text-muted-foreground py-4 text-center text-sm">
-            검색 결과가 더 있습니다. 검색어를 구체적으로 입력해주세요.
+            검색 결과가 더 있습니다. 검색어를 구체적으로 입력하세요.
           </div>
         )}
       </div>
