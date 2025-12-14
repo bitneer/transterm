@@ -154,7 +154,11 @@ export function SearchSection({
       if (!query.trim()) return;
 
       const exactMatch = results.find(
-        (term) => term.name.toLowerCase() === query.trim().toLowerCase(),
+        (term) =>
+          term.name.toLowerCase() === query.trim().toLowerCase() ||
+          term.Translation?.some(
+            (t) => t.text.trim().toLowerCase() === query.trim().toLowerCase(),
+          ),
       );
 
       if (exactMatch) {
@@ -200,7 +204,11 @@ export function SearchSection({
       {query &&
         session &&
         !results.some(
-          (term) => term.name.toLowerCase() === query.trim().toLowerCase(),
+          (term) =>
+            term.name.toLowerCase() === query.trim().toLowerCase() ||
+            term.Translation?.some(
+              (t) => t.text.trim().toLowerCase() === query.trim().toLowerCase(),
+            ),
         ) && (
           <div className="-mt-8 mb-12 text-center">
             <Link
