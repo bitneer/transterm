@@ -10,7 +10,8 @@ jobs:
   ping-supabase:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase URL
+      - name: Wake up Supabase DB
         run: |
-          curl -I -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
-          -H "apikey: ${{ secrets.SUPABASE_KEY }}"
+          curl -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/Term?select=*&limit=1" \
+          -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}"  
